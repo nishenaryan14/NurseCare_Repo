@@ -8,7 +8,7 @@
     "start:dev": "cross-env PORT=3001 ts-node-dev --respawn --transpile-only src/main.ts",
     "build": "npx tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "start:prod": "node dist/main.js",
+    "start:prod": "npx prisma migrate deploy && npx prisma generate && node dist/main.js",
     "postbuild": "prisma generate",
     "deploy": "prisma migrate deploy && prisma generate && npm run build",
     "prisma:migrate": "prisma migrate dev --name init",
