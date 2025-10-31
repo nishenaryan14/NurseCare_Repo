@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String?
+  name      String?
+  role      Role     @default(PATIENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  nurseProfile  NurseProfile?
+  patientBookings Booking[] @relation("patientBookings")
+  nurseBookings   Booking[] @relation("nurseBookings")
+  reviews         Review[]  @relation("patientReviews")
+}
+
+model NurseProfile {
+  id             Int      @id @default(autoincrement())
+  user           User     @relation(fields: [userId], references: [id])
+  userId         Int      @unique
+  specialization String[]
+  hourlyRate     Int
+  location       String
+  latitude       Float?
+  longitude      Float?
+  approved       Boolean  @default(false)
+  availability   Json?
+  totalEarnings  Float    @default(0) // Total earnings from completed bookings
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  reviews Review[] @relation("nurseReviews")
+}
+
+model Booking {
+  id              Int      @id @default(autoincrement())
+  patient         User     @relation("patientBookings", fields: [patientId], references: [id])
+  patientId       Int
+  nurse           User     @relation("nurseBookings", fields: [nurseId], references: [id])
+  nurseId         Int
+  scheduledAt     DateTime
+  durationMinutes Int
+  status          String
+  payment         Payment?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Payment {
+  id                  Int      @id @default(autoincrement())
+  booking             Booking  @relation(fields: [bookingId], references: [id])
+  bookingId           Int      @unique
+  amount              Float    // Changed from Int to Float for rupees
+  currency            String   @default("INR")
+  provider            String
+  providerPaymentId   String?
+  status              String   // PENDING, SUCCESS, FAILED, REFUNDED
+  refundedAt          DateTime? // When the payment was refunded
+  refundAmount        Float?    // Amount refunded (can be partial)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  patient   User     @relation("patientReviews", fields: [patientId], references: [id])
+  patientId Int
+  nurse     NurseProfile @relation("nurseReviews", fields: [nurseId], references: [id])
+  nurseId   Int
+  createdAt DateTime @default(now())
+}
+
+enum Role {
+  PATIENT
+  NURSE
+  ADMIN
+}
+
