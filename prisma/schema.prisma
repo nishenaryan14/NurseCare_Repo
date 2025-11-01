@@ -85,6 +85,7 @@ model Conversation {
   bookingId    Int?     // Optional: link to a booking
   participants ConversationParticipant[]
   messages     Message[]
+  videoCalls   VideoCall[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -112,6 +113,20 @@ model Message {
   createdAt      DateTime     @default(now())
 }
 
+model VideoCall {
+  id             Int          @id @default(autoincrement())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversationId Int
+  roomName       String       @unique
+  startedBy      Int          // User ID who started the call
+  startedAt      DateTime     @default(now())
+  endedAt        DateTime?
+  duration       Int?         // Duration in seconds
+  status         CallStatus   @default(ONGOING)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
 enum Role {
   PATIENT
   NURSE
@@ -123,5 +138,11 @@ enum MessageType {
   IMAGE
   FILE
   SYSTEM
+}
+
+enum CallStatus {
+  ONGOING
+  ENDED
+  MISSED
 }
 
