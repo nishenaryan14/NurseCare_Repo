@@ -67,7 +67,7 @@ export class MessagingService {
 
   // Get all conversations for a user
   async getUserConversations(userId: number) {
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where: {
         participants: {
           some: { userId },
@@ -83,7 +83,7 @@ export class MessagingService {
         },
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 1, // Get last message for preview
+          take: 50, // Get more messages for unread count calculation
           include: {
             sender: {
               select: { id: true, name: true, role: true },
@@ -95,6 +95,12 @@ export class MessagingService {
         updatedAt: 'desc',
       },
     });
+
+    // Add unread count to each conversation
+    return conversations.map(conv => ({
+      ...conv,
+      unreadCount: conv.messages.filter(msg => !msg.read && msg.senderId !== userId).length,
+    }));
   }
 
   // Send a message
