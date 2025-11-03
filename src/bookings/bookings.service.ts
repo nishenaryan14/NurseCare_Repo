@@ -29,12 +29,19 @@ export class BookingsService {
     const availability = nurse.nurseProfile.availability || {};
     const dateObj = new Date(scheduledAt);
     if (isNaN(dateObj.getTime())) throw new BadRequestException('Invalid scheduledAt');
-    // Calculate day label (Mon, Tue, ...) and hour integer
-    const dayIdx = dateObj.getDay() - 1 < 0 ? 6 : dateObj.getDay() - 1; // (Monday=0, Sunday=6)
+    
+    // Convert UTC time to IST (UTC+5:30) for availability check
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const istDate = new Date(dateObj.getTime() + istOffset);
+    
+    // Calculate day label (Mon, Tue, ...) and hour integer in IST
+    const dayIdx = istDate.getUTCDay() - 1 < 0 ? 6 : istDate.getUTCDay() - 1; // (Monday=0, Sunday=6)
     const dayLabel = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][dayIdx];
-    const hourVal = dateObj.getHours();
+    const hourVal = istDate.getUTCHours(); // Hour in IST
+    
     const allowedHours = Array.isArray((availability as any)?.[dayLabel]) ? (availability as any)[dayLabel] : [];
     if (!allowedHours.includes(hourVal)) {
+      console.log(`⏰ Availability check failed: Day=${dayLabel}, Hour=${hourVal}, Allowed=${JSON.stringify(allowedHours)}`);
       throw new BadRequestException('Nurse is not available at the selected time');
     }
 
