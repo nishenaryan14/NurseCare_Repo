@@ -275,8 +275,48 @@ export class AdminService {
       throw new ForbiddenException('Cannot delete user with active bookings');
     }
 
-    return this.prisma.user.delete({
-      where: { id: userId },
+    // Delete related records first to avoid foreign key constraint violations
+    // Use a transaction to ensure all deletes succeed or none do
+    return this.prisma.$transaction(async (prisma) => {
+      // Find nurse profile first (before deleting)
+      const nurseProfile = await prisma.nurseProfile.findFirst({
+        where: { userId },
+      });
+
+      // Delete reviews for this nurse (if they are a nurse)
+      if (nurseProfile) {
+        await prisma.review.deleteMany({
+          where: { nurseId: nurseProfile.id },
+        });
+      }
+
+      // Delete reviews by this user
+      await prisma.review.deleteMany({
+        where: { patientId: userId },
+      });
+
+      // Delete nurse profile if exists
+      await prisma.nurseProfile.deleteMany({
+        where: { userId },
+      });
+
+      // Delete conversation participants
+      await prisma.conversationParticipant.deleteMany({
+        where: { userId },
+      });
+
+      // Delete completed bookings (historical data)
+      await prisma.booking.deleteMany({
+        where: {
+          OR: [{ patientId: userId }, { nurseId: userId }],
+          status: 'COMPLETED',
+        },
+      });
+
+      // Finally delete the user
+      return prisma.user.delete({
+        where: { id: userId },
+      });
     });
   }
 
