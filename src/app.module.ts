@@ -11,6 +11,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { VideoCallsModule } from './video-calls/video-calls.module';
 import { SeedModule } from './seed/seed.module';
 import { FilesModule } from './files/files.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { FilesModule } from './files/files.module';
     VideoCallsModule,
     SeedModule,
     FilesModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
