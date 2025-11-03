@@ -11,7 +11,7 @@ async function bootstrap() {
     'http://localhost:3000',
     'http://localhost:3001',
     'http://192.168.0.8:3000', // Network access
-    // Add your Vercel domain here after deployment
+    'https://nurse-care-frontend.vercel.app', // Vercel deployment
     process.env.FRONTEND_URL,
   ].filter(Boolean);
 
@@ -20,8 +20,11 @@ async function bootstrap() {
       // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
       
-      // Allow localhost and network IPs
-      if (origin.includes('localhost') || origin.includes('192.168.') || allowedOrigins.includes(origin)) {
+      // Allow localhost, network IPs, and Vercel domains
+      if (origin.includes('localhost') || 
+          origin.includes('192.168.') || 
+          origin.includes('vercel.app') ||
+          allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       
