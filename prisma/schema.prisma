@@ -21,6 +21,7 @@ model User {
   reviews         Review[]  @relation("patientReviews")
   sentMessages    Message[] @relation("sentMessages")
   conversations   ConversationParticipant[]
+  uploadedFiles   File[]    @relation("uploadedFiles")
 }
 
 model NurseProfile {
@@ -86,6 +87,7 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
   videoCalls   VideoCall[]
+  files        File[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -146,3 +148,17 @@ enum CallStatus {
   MISSED
 }
 
+model File {
+  id              Int      @id @default(autoincrement())
+  filename        String   // Original filename
+  storedFilename  String   // Stored filename with timestamp
+  filepath        String   // Full path on server
+  mimetype        String   // File MIME type
+  size            Int      // File size in bytes
+  uploadedBy      User     @relation("uploadedFiles", fields: [uploadedById], references: [id])
+  uploadedById    Int
+  conversation    Conversation? @relation(fields: [conversationId], references: [id])
+  conversationId  Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
