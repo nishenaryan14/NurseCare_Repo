@@ -14,7 +14,7 @@ export class AdminService {
       totalBookings,
       pendingBookings,
       completedBookings,
-      totalRevenue,
+      totalPayments,
       activeConversations,
       totalMessages,
       totalFiles,
@@ -237,15 +237,14 @@ export class AdminService {
       where: { id: userId },
       include: {
         nurseProfile: true,
-        bookingsAsPatient: {
+        patientBookings: {
           take: 10,
           orderBy: { createdAt: 'desc' },
         },
-        bookingsAsNurse: {
+        nurseBookings: {
           take: 10,
           orderBy: { createdAt: 'desc' },
         },
-        // conversations omitted for simplicity
       },
     });
 
