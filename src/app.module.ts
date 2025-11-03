@@ -9,6 +9,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { VideoCallsModule } from './video-calls/video-calls.module';
+import { SeedModule } from './seed/seed.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { VideoCallsModule } from './video-calls/video-calls.module';
     ReviewsModule,
     MessagingModule,
     VideoCallsModule,
+    SeedModule,
   ],
 })
 export class AppModule {}
