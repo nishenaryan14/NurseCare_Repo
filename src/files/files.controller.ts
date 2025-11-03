@@ -14,8 +14,8 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Response } from 'express';
+import { JwtAuthGuard } from '../common/guards/jwt.guard';
+import type { Response } from 'express';
 
 @Controller('files')
 @UseGuards(JwtAuthGuard)
@@ -25,7 +25,7 @@ export class FilesController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Req() req: any,
   ) {
     if (!file) {

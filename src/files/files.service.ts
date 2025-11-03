@@ -15,7 +15,7 @@ export class FilesService {
   }
 
   async uploadFile(
-    file: Express.Multer.File,
+    file: any,
     userId: number,
     conversationId?: number,
   ) {
