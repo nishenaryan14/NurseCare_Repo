@@ -50,6 +50,7 @@ export class FilesController {
         filename: uploadedFile.filename,
         mimetype: uploadedFile.mimetype,
         size: uploadedFile.size,
+        url: uploadedFile.filepath,
         createdAt: uploadedFile.createdAt,
       },
     };
@@ -68,6 +69,7 @@ export class FilesController {
       filename: file.filename,
       mimetype: file.mimetype,
       size: file.size,
+      url: file.filepath,
       uploadedBy: file.uploadedBy,
       createdAt: file.createdAt,
     };
@@ -104,6 +106,7 @@ export class FilesController {
         filename: f.filename,
         mimetype: f.mimetype,
         size: f.size,
+        url: f.filepath,
         uploadedBy: f.uploadedBy,
         createdAt: f.createdAt,
       })),
