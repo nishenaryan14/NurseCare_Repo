@@ -1,27 +1,17 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import * as fs from 'fs';
-import * as path from 'path';
-import { promisify } from 'util';
-
-const writeFile = promisify(fs.writeFile);
-const mkdir = promisify(fs.mkdir);
-const unlink = promisify(fs.unlink);
+import { v2 as cloudinary } from 'cloudinary';
+import { Readable } from 'stream';
 
 @Injectable()
 export class FilesService {
-  private readonly uploadDir = path.join(process.cwd(), 'uploads');
-
   constructor(private prisma: PrismaService) {
-    this.ensureUploadDir();
-  }
-
-  private async ensureUploadDir() {
-    try {
-      await mkdir(this.uploadDir, { recursive: true });
-    } catch (error) {
-      console.error('Failed to create upload directory:', error);
-    }
+    // Configure Cloudinary
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
   }
 
   async uploadFile(
@@ -29,17 +19,35 @@ export class FilesService {
     userId: number,
     conversationId?: number,
   ) {
-    const filename = `${Date.now()}-${file.originalname}`;
-    const filepath = path.join(this.uploadDir, filename);
-
     try {
-      await writeFile(filepath, file.buffer);
+      // Upload to Cloudinary
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'nursecare-files',
+            resource_type: 'auto',
+            public_id: `${Date.now()}-${file.originalname.split('.')[0]}`,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          },
+        );
 
+        const bufferStream = new Readable();
+        bufferStream.push(file.buffer);
+        bufferStream.push(null);
+        bufferStream.pipe(uploadStream);
+      });
+
+      const cloudinaryResult = uploadResult as any;
+
+      // Save to database
       const fileRecord = await this.prisma.file.create({
         data: {
           filename: file.originalname,
-          storedFilename: filename,
-          filepath: filepath,
+          storedFilename: cloudinaryResult.public_id,
+          filepath: cloudinaryResult.secure_url,
           mimetype: file.mimetype,
           size: file.size,
           uploadedById: userId,
@@ -129,10 +137,10 @@ export class FilesService {
     }
 
     try {
-      // Delete physical file
-      await unlink(file.filepath);
+      // Delete from Cloudinary
+      await cloudinary.uploader.destroy(file.storedFilename);
     } catch (error) {
-      console.error('Failed to delete physical file:', error);
+      console.error('Failed to delete file from Cloudinary:', error);
     }
 
     // Delete database record
@@ -143,7 +151,7 @@ export class FilesService {
     return { message: 'File deleted successfully' };
   }
 
-  getFilePath(storedFilename: string): string {
-    return path.join(this.uploadDir, storedFilename);
+  getFileUrl(filepath: string): string {
+    return filepath; // Already a Cloudinary URL
   }
 }

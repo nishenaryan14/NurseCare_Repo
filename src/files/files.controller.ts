@@ -16,7 +16,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Response } from 'express';
-import * as fs from 'fs';
 
 @Controller('files')
 @UseGuards(JwtAuthGuard)
@@ -83,20 +82,8 @@ export class FilesController {
     const userId = req.user.userId;
     const file = await this.filesService.getFile(id, userId);
 
-    const filepath = this.filesService.getFilePath(file.storedFilename);
-
-    if (!fs.existsSync(filepath)) {
-      throw new BadRequestException('File not found on server');
-    }
-
-    res.setHeader('Content-Type', file.mimetype);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${file.filename}"`,
-    );
-
-    const fileStream = fs.createReadStream(filepath);
-    fileStream.pipe(res);
+    // Redirect to Cloudinary URL
+    res.redirect(file.filepath);
   }
 
   @Get('conversation/:conversationId')
