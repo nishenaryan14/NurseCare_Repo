@@ -8,20 +8,23 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String?
-  name      String?
-  role      Role     @default(PATIENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  nurseProfile  NurseProfile?
-  patientBookings Booking[] @relation("patientBookings")
-  nurseBookings   Booking[] @relation("nurseBookings")
-  reviews         Review[]  @relation("patientReviews")
-  sentMessages    Message[] @relation("sentMessages")
-  conversations   ConversationParticipant[]
-  uploadedFiles   File[]    @relation("uploadedFiles")
+  id                    Int      @id @default(autoincrement())
+  email                 String   @unique
+  password              String?
+  name                  String?
+  role                  Role     @default(PATIENT)
+  emailVerified         Boolean  @default(false)
+  emailVerificationToken String?
+  emailVerificationExpiry DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  nurseProfile          NurseProfile?
+  patientBookings       Booking[] @relation("patientBookings")
+  nurseBookings         Booking[] @relation("nurseBookings")
+  reviews               Review[]  @relation("patientReviews")
+  sentMessages          Message[] @relation("sentMessages")
+  conversations         ConversationParticipant[]
+  uploadedFiles         File[]    @relation("uploadedFiles")
 }
 
 model NurseProfile {

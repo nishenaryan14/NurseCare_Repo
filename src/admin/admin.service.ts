@@ -305,6 +305,23 @@ export class AdminService {
         where: { userId },
       });
 
+      // Delete payments for completed bookings first (to avoid foreign key constraint)
+      const completedBookings = await prisma.booking.findMany({
+        where: {
+          OR: [{ patientId: userId }, { nurseId: userId }],
+          status: 'COMPLETED',
+        },
+        select: { id: true },
+      });
+
+      if (completedBookings.length > 0) {
+        await prisma.payment.deleteMany({
+          where: {
+            bookingId: { in: completedBookings.map((b) => b.id) },
+          },
+        });
+      }
+
       // Delete completed bookings (historical data)
       await prisma.booking.deleteMany({
         where: {
