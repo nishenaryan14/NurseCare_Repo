@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { MessagingService } from '../messaging.service';
 import { UseGuards } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @WebSocketGateway({
   cors: {
@@ -21,32 +22,72 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   @WebSocketServer()
   server: Server;
 
-  private userSockets: Map<number, string> = new Map(); // userId -> socketId
+  private userSockets: Map<number, Set<string>> = new Map(); // userId -> Set of socketIds (multiple devices)
 
-  constructor(private messagingService: MessagingService) {}
+  constructor(
+    private messagingService: MessagingService,
+    private prisma: PrismaService,
+  ) {}
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     console.log(`Client disconnected: ${client.id}`);
-    // Remove user from online users
-    for (const [userId, socketId] of this.userSockets.entries()) {
-      if (socketId === client.id) {
-        this.userSockets.delete(userId);
+    
+    // Find and remove user from online users
+    for (const [userId, socketIds] of this.userSockets.entries()) {
+      if (socketIds.has(client.id)) {
+        socketIds.delete(client.id);
+        
+        // If user has no more active connections, mark as offline
+        if (socketIds.size === 0) {
+          this.userSockets.delete(userId);
+          
+          // Update database
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: { 
+              isOnline: false,
+              lastSeen: new Date(),
+            },
+          });
+          
+          // Broadcast offline status
+          await this.broadcastUserStatus(userId, false);
+        }
         break;
       }
     }
   }
 
   @SubscribeMessage('register')
-  handleRegister(
+  async handleRegister(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: number },
   ) {
-    this.userSockets.set(data.userId, client.id);
+    // Add socket to user's connections
+    if (!this.userSockets.has(data.userId)) {
+      this.userSockets.set(data.userId, new Set());
+    }
+    this.userSockets.get(data.userId).add(client.id);
+    
     console.log(`User ${data.userId} registered with socket ${client.id}`);
+    
+    // Update user status in database
+    await this.prisma.user.update({
+      where: { id: data.userId },
+      data: { 
+        isOnline: true,
+        lastSeen: new Date(),
+        lastActivity: new Date(),
+      },
+    });
+    
+    // Broadcast online status to relevant users
+    await this.broadcastUserStatus(data.userId, true);
+    
     return { event: 'registered', data: { userId: data.userId } };
   }
 
@@ -61,6 +102,12 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     },
   ) {
     try {
+      // Update sender's last activity
+      await this.prisma.user.update({
+        where: { id: data.senderId },
+        data: { lastActivity: new Date() },
+      });
+      
       // Save message to database
       const message = await this.messagingService.sendMessage(
         data.conversationId,
@@ -70,7 +117,7 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
       );
 
       // Get conversation participants
-      const conversation = await this.messagingService['prisma'].conversation.findUnique({
+      const conversation = await this.prisma.conversation.findUnique({
         where: { id: data.conversationId },
         include: {
           participants: true,
@@ -79,9 +126,11 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       // Emit message to all participants
       conversation?.participants.forEach((participant) => {
-        const socketId = this.userSockets.get(participant.userId);
-        if (socketId) {
-          this.server.to(socketId).emit('newMessage', message);
+        const socketIds = this.userSockets.get(participant.userId);
+        if (socketIds) {
+          socketIds.forEach(socketId => {
+            this.server.to(socketId).emit('newMessage', message);
+          });
         }
       });
 
@@ -99,8 +148,26 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     client.join(`conversation_${data.conversationId}`);
     
+    // Update user activity
+    await this.prisma.user.update({
+      where: { id: data.userId },
+      data: { lastActivity: new Date() },
+    });
+    
     // Mark messages as read
-    await this.messagingService.markAsRead(data.conversationId, data.userId);
+    const updatedCount = await this.messagingService.markAsRead(
+      data.conversationId, 
+      data.userId
+    );
+    
+    // Notify other participants that messages were read
+    if (updatedCount > 0) {
+      client.to(`conversation_${data.conversationId}`).emit('messagesRead', {
+        conversationId: data.conversationId,
+        readBy: data.userId,
+        timestamp: new Date(),
+      });
+    }
     
     return {
       event: 'joinedConversation',
@@ -121,10 +188,16 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('typing')
-  handleTyping(
+  async handleTyping(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: number; userId: number; isTyping: boolean },
   ) {
+    // Update user activity
+    await this.prisma.user.update({
+      where: { id: data.userId },
+      data: { lastActivity: new Date() },
+    });
+    
     // Broadcast typing status to conversation room
     client.to(`conversation_${data.conversationId}`).emit('userTyping', {
       userId: data.userId,
@@ -144,5 +217,80 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     });
     
     return { event: 'videoCallStarted', data: { roomName: data.roomName } };
+  }
+
+  @SubscribeMessage('getOnlineStatus')
+  async handleGetOnlineStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userIds: number[] },
+  ) {
+    const statuses = await Promise.all(
+      data.userIds.map(async (userId) => {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, isOnline: true, lastSeen: true },
+        });
+        return user;
+      })
+    );
+    
+    return { event: 'onlineStatuses', data: statuses };
+  }
+
+  // Helper method to broadcast user status changes
+  private async broadcastUserStatus(userId: number, isOnline: boolean) {
+    try {
+      // Get all conversations this user is part of
+      const conversations = await this.prisma.conversationParticipant.findMany({
+        where: { userId },
+        include: {
+          conversation: {
+            include: {
+              participants: true,
+            },
+          },
+        },
+      });
+      
+      // Get user's last seen
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { lastSeen: true },
+      });
+      
+      // Notify all other participants in those conversations
+      conversations.forEach(convParticipant => {
+        convParticipant.conversation.participants.forEach(participant => {
+          if (participant.userId !== userId) {
+            const socketIds = this.userSockets.get(participant.userId);
+            if (socketIds) {
+              socketIds.forEach(socketId => {
+                this.server.to(socketId).emit('userStatusChanged', {
+                  userId,
+                  isOnline,
+                  lastSeen: user?.lastSeen || new Date(),
+                });
+              });
+            }
+          }
+        });
+      });
+    } catch (error) {
+      console.error('Error broadcasting user status:', error);
+    }
+  }
+
+  // Heartbeat to update activity
+  @SubscribeMessage('heartbeat')
+  async handleHeartbeat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId: number },
+  ) {
+    await this.prisma.user.update({
+      where: { id: data.userId },
+      data: { lastActivity: new Date() },
+    });
+    
+    return { event: 'heartbeatAck' };
   }
 }

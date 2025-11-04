@@ -144,8 +144,8 @@ export class MessagingService {
   }
 
   // Mark messages as read
-  async markAsRead(conversationId: number, userId: number) {
-    return this.prisma.message.updateMany({
+  async markAsRead(conversationId: number, userId: number): Promise<number> {
+    const result = await this.prisma.message.updateMany({
       where: {
         conversationId,
         senderId: { not: userId },
@@ -155,6 +155,8 @@ export class MessagingService {
         read: true,
       },
     });
+    
+    return result.count; // Return number of messages marked as read
   }
 
   // Get unread message count
