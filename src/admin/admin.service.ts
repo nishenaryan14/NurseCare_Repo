@@ -300,6 +300,16 @@ export class AdminService {
         where: { userId },
       });
 
+      // Delete messages sent by this user
+      await prisma.message.deleteMany({
+        where: { senderId: userId },
+      });
+
+      // Delete files uploaded by this user
+      await prisma.file.deleteMany({
+        where: { uploadedById: userId },
+      });
+
       // Delete conversation participants
       await prisma.conversationParticipant.deleteMany({
         where: { userId },
