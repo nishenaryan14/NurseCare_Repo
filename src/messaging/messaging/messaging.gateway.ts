@@ -234,6 +234,9 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
       })
     );
     
+    // Emit directly to the client
+    client.emit('onlineStatuses', statuses);
+    
     return { event: 'onlineStatuses', data: statuses };
   }
 
