@@ -39,4 +39,19 @@ export class VideoCallsController {
   async getOngoingCall(@Param('id') conversationId: string) {
     return this.videoCallsService.getOngoingCall(parseInt(conversationId));
   }
+
+  // Mark call as missed
+  @Patch(':id/missed')
+  async markCallAsMissed(@Param('id') callId: string) {
+    return this.videoCallsService.markCallAsMissed(parseInt(callId));
+  }
+
+  // Accept call
+  @Post('accept')
+  async acceptCall(
+    @Body() body: { roomName: string },
+    @Req() req: any,
+  ) {
+    return this.videoCallsService.acceptCall(body.roomName, req.user.userId);
+  }
 }

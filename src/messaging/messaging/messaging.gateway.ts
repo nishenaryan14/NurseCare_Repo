@@ -206,17 +206,73 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   @SubscribeMessage('startVideoCall')
-  handleStartVideoCall(
+  async handleStartVideoCall(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { conversationId: number; roomName: string; userId: number },
+    @MessageBody() data: { conversationId: number; roomName: string; userId: number; callId: number },
   ) {
     // Notify other participants about video call
     client.to(`conversation_${data.conversationId}`).emit('incomingVideoCall', {
       roomName: data.roomName,
       callerId: data.userId,
+      callId: data.callId,
+      conversationId: data.conversationId,
     });
     
+    // Broadcast to all participants to refresh messages
+    this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
+    
     return { event: 'videoCallStarted', data: { roomName: data.roomName } };
+  }
+
+  @SubscribeMessage('acceptVideoCall')
+  async handleAcceptVideoCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: number; roomName: string; userId: number },
+  ) {
+    // Notify other participants that call was accepted
+    client.to(`conversation_${data.conversationId}`).emit('videoCallAccepted', {
+      roomName: data.roomName,
+      userId: data.userId,
+    });
+    
+    // Broadcast to all participants to refresh messages
+    this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
+    
+    return { event: 'videoCallAccepted', data: { roomName: data.roomName } };
+  }
+
+  @SubscribeMessage('endVideoCall')
+  async handleEndVideoCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: number; userId: number; duration?: string },
+  ) {
+    // Notify other participants that call ended
+    client.to(`conversation_${data.conversationId}`).emit('videoCallEnded', {
+      userId: data.userId,
+      duration: data.duration,
+    });
+    
+    // Broadcast to all participants to refresh messages
+    this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
+    
+    return { event: 'videoCallEnded' };
+  }
+
+  @SubscribeMessage('rejectVideoCall')
+  async handleRejectVideoCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: number; callId: number; userId: number },
+  ) {
+    // Notify caller that call was rejected/missed
+    client.to(`conversation_${data.conversationId}`).emit('videoCallRejected', {
+      callId: data.callId,
+      userId: data.userId,
+    });
+    
+    // Broadcast to all participants to refresh messages
+    this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
+    
+    return { event: 'videoCallRejected' };
   }
 
   @SubscribeMessage('getOnlineStatus')
