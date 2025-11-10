@@ -46,6 +46,12 @@ export class VideoCallsController {
     return this.videoCallsService.markCallAsMissed(parseInt(callId));
   }
 
+  // Reject call
+  @Patch(':id/reject')
+  async rejectCall(@Param('id') callId: string, @Req() req: any) {
+    return this.videoCallsService.rejectCall(parseInt(callId), req.user.userId);
+  }
+
   // Accept call
   @Post('accept')
   async acceptCall(

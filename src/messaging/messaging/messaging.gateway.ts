@@ -263,8 +263,14 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: number; callId: number; userId: number },
   ) {
-    // Notify caller that call was rejected/missed
-    client.to(`conversation_${data.conversationId}`).emit('videoCallRejected', {
+    // Notify ALL participants that call was rejected (including caller)
+    this.server.to(`conversation_${data.conversationId}`).emit('videoCallRejected', {
+      callId: data.callId,
+      userId: data.userId,
+    });
+    
+    // Also emit to the client who rejected
+    client.emit('videoCallRejected', {
       callId: data.callId,
       userId: data.userId,
     });
@@ -273,6 +279,29 @@ export class MessagingGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
     
     return { event: 'videoCallRejected' };
+  }
+
+  @SubscribeMessage('hangupVideoCall')
+  async handleHangupVideoCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: number; callId: number; userId: number },
+  ) {
+    // Notify ALL participants that call was hung up (terminate for everyone)
+    this.server.to(`conversation_${data.conversationId}`).emit('videoCallHungUp', {
+      callId: data.callId,
+      userId: data.userId,
+    });
+    
+    // Also emit to the client who hung up
+    client.emit('videoCallHungUp', {
+      callId: data.callId,
+      userId: data.userId,
+    });
+    
+    // Broadcast to all participants to refresh messages
+    this.server.to(`conversation_${data.conversationId}`).emit('refreshMessages');
+    
+    return { event: 'videoCallHungUp' };
   }
 
   @SubscribeMessage('getOnlineStatus')

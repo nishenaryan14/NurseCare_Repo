@@ -136,7 +136,7 @@ export class VideoCallsService {
     });
   }
 
-  // Mark call as missed
+  // Mark call as missed/rejected
   async markCallAsMissed(callId: number) {
     const call = await this.prisma.videoCall.findUnique({
       where: { id: callId },
@@ -151,6 +151,32 @@ export class VideoCallsService {
       call.conversationId,
       call.startedBy,
       'VIDEO_CALL_MISSED',
+    );
+
+    return this.prisma.videoCall.update({
+      where: { id: callId },
+      data: {
+        status: 'MISSED',
+        endedAt: new Date(),
+      },
+    });
+  }
+
+  // Reject call (called by receiver)
+  async rejectCall(callId: number, userId: number) {
+    const call = await this.prisma.videoCall.findUnique({
+      where: { id: callId },
+    });
+
+    if (!call) {
+      throw new Error('Call not found');
+    }
+
+    // Create system message for rejected call
+    await this.createCallMessage(
+      call.conversationId,
+      userId,
+      'VIDEO_CALL_REJECTED',
     );
 
     return this.prisma.videoCall.update({
